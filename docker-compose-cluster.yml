@@ -1,0 +1,120 @@
+# Docker Compose for multi-node Raft cluster testing
+# Each region has 3 Raft nodes for leader election
+# Cross-region communication uses all nodes in peer region for failover
+# Run with: docker compose -f docker-compose-cluster.yml up -d
+
+services:
+  # ============================================
+  # US-EAST REGION - 3 Raft nodes
+  # ============================================
+  us-east-node-1:
+    build: .
+    container_name: us-east-node-1
+    hostname: us-east-node-1
+    environment:
+      - NODE_ID=us-east-node-1
+      - REGION_ID=us-east
+      - RAFT_PEERS=us-east-node-2:us-east-node-2:9090,us-east-node-3:us-east-node-3:9090
+      - REGION_PEERS=us-west:us-west-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9090:9090"
+    networks:
+      - lockmgr-cluster
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090 || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  us-east-node-2:
+    build: .
+    container_name: us-east-node-2
+    hostname: us-east-node-2
+    environment:
+      - NODE_ID=us-east-node-2
+      - REGION_ID=us-east
+      - RAFT_PEERS=us-east-node-1:us-east-node-1:9090,us-east-node-3:us-east-node-3:9090
+      - REGION_PEERS=us-west:us-west-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9190:9090"
+    networks:
+      - lockmgr-cluster
+    depends_on:
+      - us-east-node-1
+
+  us-east-node-3:
+    build: .
+    container_name: us-east-node-3
+    hostname: us-east-node-3
+    environment:
+      - NODE_ID=us-east-node-3
+      - REGION_ID=us-east
+      - RAFT_PEERS=us-east-node-1:us-east-node-1:9090,us-east-node-2:us-east-node-2:9090
+      - REGION_PEERS=us-west:us-west-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9290:9090"
+    networks:
+      - lockmgr-cluster
+    depends_on:
+      - us-east-node-1
+
+  # ============================================
+  # US-WEST REGION - 3 Raft nodes
+  # ============================================
+  us-west-node-1:
+    build: .
+    container_name: us-west-node-1
+    hostname: us-west-node-1
+    environment:
+      - NODE_ID=us-west-node-1
+      - REGION_ID=us-west
+      - RAFT_PEERS=us-west-node-2:us-west-node-2:9090,us-west-node-3:us-west-node-3:9090
+      - REGION_PEERS=us-east:us-east-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9390:9090"
+    networks:
+      - lockmgr-cluster
+    depends_on:
+      - us-east-node-1
+
+  us-west-node-2:
+    build: .
+    container_name: us-west-node-2
+    hostname: us-west-node-2
+    environment:
+      - NODE_ID=us-west-node-2
+      - REGION_ID=us-west
+      - RAFT_PEERS=us-west-node-1:us-west-node-1:9090,us-west-node-3:us-west-node-3:9090
+      - REGION_PEERS=us-east:us-east-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9490:9090"
+    networks:
+      - lockmgr-cluster
+    depends_on:
+      - us-west-node-1
+
+  us-west-node-3:
+    build: .
+    container_name: us-west-node-3
+    hostname: us-west-node-3
+    environment:
+      - NODE_ID=us-west-node-3
+      - REGION_ID=us-west
+      - RAFT_PEERS=us-west-node-1:us-west-node-1:9090,us-west-node-2:us-west-node-2:9090
+      - REGION_PEERS=us-east:us-east-node-1:9090
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9590:9090"
+    networks:
+      - lockmgr-cluster
+    depends_on:
+      - us-west-node-1
+
+networks:
+  lockmgr-cluster:
+    driver: bridge

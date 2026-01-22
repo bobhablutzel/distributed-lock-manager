@@ -1,0 +1,80 @@
+# Docker Compose for local multi-region testing
+# Run with: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Region 1: US-East
+  lockmgr-us-east-1:
+    build: .
+    container_name: lockmgr-us-east-1
+    hostname: us-east-1
+    environment:
+      - NODE_ID=us-east-node-1
+      - REGION_ID=us-east-1
+      - US_WEST_HOST=us-west-2
+      - US_WEST_PORT=9091
+      - EU_WEST_HOST=eu-west-1
+      - EU_WEST_PORT=9091
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9090:9090"   # Client gRPC
+      - "9091:9091"   # Inter-region gRPC
+    networks:
+      - lockmgr-network
+    healthcheck:
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:9090", "grpc.health.v1.Health/Check"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Region 2: US-West
+  lockmgr-us-west-2:
+    build: .
+    container_name: lockmgr-us-west-2
+    hostname: us-west-2
+    environment:
+      - NODE_ID=us-west-node-1
+      - REGION_ID=us-west-2
+      - US_WEST_HOST=us-east-1
+      - US_WEST_PORT=9091
+      - EU_WEST_HOST=eu-west-1
+      - EU_WEST_PORT=9091
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9190:9090"
+      - "9191:9091"
+    networks:
+      - lockmgr-network
+    depends_on:
+      - lockmgr-us-east-1
+
+  # Region 3: EU-West
+  lockmgr-eu-west-1:
+    build: .
+    container_name: lockmgr-eu-west-1
+    hostname: eu-west-1
+    environment:
+      - NODE_ID=eu-west-node-1
+      - REGION_ID=eu-west-1
+      - US_WEST_HOST=us-west-2
+      - US_WEST_PORT=9091
+      - EU_WEST_HOST=us-east-1
+      - EU_WEST_PORT=9091
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75.0
+    ports:
+      - "9290:9090"
+      - "9291:9091"
+    networks:
+      - lockmgr-network
+    depends_on:
+      - lockmgr-us-east-1
+      - lockmgr-us-west-2
+
+networks:
+  lockmgr-network:
+    driver: bridge
+
+# Volumes for persistence (if needed later)
+volumes:
+  lockmgr-data:

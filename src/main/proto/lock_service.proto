@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package com.nationsbenefits.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.nationsbenefits.grpc.generated";
+option java_outer_classname = "LockServiceProto";
+
+// Client-facing Lock Service API
+service LockService {
+    // Acquire a distributed lock with a specified timeout
+    rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse);
+
+    // Release a previously acquired lock
+    rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse);
+
+    // Check the status of a lock (who holds it, TTL remaining)
+    rpc CheckLock(CheckLockRequest) returns (CheckLockResponse);
+}
+
+message AcquireLockRequest {
+    // Unique identifier for the lock (GUID)
+    string lock_id = 1;
+
+    // Client identifier requesting the lock
+    string client_id = 2;
+
+    // Requested lock timeout in milliseconds
+    int64 timeout_ms = 3;
+}
+
+message AcquireLockResponse {
+    // Whether the lock was successfully acquired
+    bool success = 1;
+
+    // Fencing token for this lock acquisition (monotonically increasing)
+    // Used to detect stale lock holders
+    int64 fencing_token = 2;
+
+    // Timestamp when the lock will expire (epoch milliseconds)
+    int64 expires_at = 3;
+
+    // Error message if acquisition failed
+    string error_message = 4;
+
+    // Status code for the response
+    LockStatus status = 5;
+}
+
+message ReleaseLockRequest {
+    // Unique identifier for the lock (GUID)
+    string lock_id = 1;
+
+    // Client identifier releasing the lock
+    string client_id = 2;
+
+    // Fencing token from the original acquisition
+    // Must match current token to release
+    int64 fencing_token = 3;
+}
+
+message ReleaseLockResponse {
+    // Whether the lock was successfully released
+    bool success = 1;
+
+    // Error message if release failed
+    string error_message = 2;
+
+    // Status code for the response
+    LockStatus status = 3;
+}
+
+message CheckLockRequest {
+    // Unique identifier for the lock (GUID)
+    string lock_id = 1;
+}
+
+message CheckLockResponse {
+    // Whether the lock is currently held
+    bool is_locked = 1;
+
+    // Client ID currently holding the lock (empty if not locked)
+    string holder_id = 2;
+
+    // Current fencing token (0 if not locked)
+    int64 fencing_token = 3;
+
+    // Time remaining until lock expires in milliseconds (0 if not locked)
+    int64 ttl_ms = 4;
+
+    // Timestamp when the lock will expire (0 if not locked)
+    int64 expires_at = 5;
+
+    // Status code for the response
+    LockStatus status = 6;
+}
+
+enum LockStatus {
+    // Unspecified status
+    LOCK_STATUS_UNSPECIFIED = 0;
+
+    // Operation completed successfully
+    LOCK_STATUS_OK = 1;
+
+    // Lock is already held by another client
+    LOCK_STATUS_ALREADY_LOCKED = 2;
+
+    // Lock not found (never acquired)
+    LOCK_STATUS_NOT_FOUND = 3;
+
+    // Fencing token mismatch
+    LOCK_STATUS_INVALID_TOKEN = 4;
+
+    // Lock has already expired
+    LOCK_STATUS_EXPIRED = 5;
+
+    // Quorum could not be reached
+    LOCK_STATUS_QUORUM_FAILED = 6;
+
+    // Internal server error
+    LOCK_STATUS_ERROR = 7;
+
+    // Request timed out
+    LOCK_STATUS_TIMEOUT = 8;
+
+    // This node is not the leader
+    LOCK_STATUS_NOT_LEADER = 9;
+}

@@ -1,0 +1,92 @@
+# Distributed Lock Manager Configuration
+# ========================================
+
+spring:
+  application:
+    name: lockmgr
+  main:
+    banner-mode: off
+
+# gRPC Server Configuration
+grpc:
+  server:
+    port: 9090
+
+# Lock Manager Configuration
+lockmgr:
+  # Raft consensus configuration (intra-region cluster)
+  raft:
+    node-id: ${NODE_ID:node-1}
+    election-timeout-ms: ${RAFT_ELECTION_TIMEOUT_MS:150}
+    heartbeat-interval-ms: ${RAFT_HEARTBEAT_INTERVAL_MS:50}
+    # Comma-separated list of peers: nodeId:host:port,nodeId:host:port
+    peers: ${RAFT_PEERS:}
+
+  # Region configuration (cross-region quorum)
+  region:
+    region-id: ${REGION_ID:us-east-1}
+    region-port: ${REGION_PORT:9091}
+    quorum-timeout-ms: ${QUORUM_TIMEOUT_MS:5000}
+    # Comma-separated list of region peers: regionId:host:port,regionId:host:port
+    # Example: REGION_PEERS=us-west:us-west-node-1:9090,eu-west:eu-west-node-1:9090
+    peers-string: ${REGION_PEERS:}
+
+  # Lock behavior configuration
+  lock:
+    default-timeout-ms: 30000
+    max-timeout-ms: 300000
+    min-timeout-ms: 1000
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.lockmgr: DEBUG
+    io.grpc: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+# Profile: Production
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+grpc:
+  server:
+    security:
+      enabled: true
+      certificate-chain: classpath:certs/server.crt
+      private-key: classpath:certs/server.key
+
+logging:
+  level:
+    root: WARN
+    com.lockmgr: INFO
+
+---
+# Profile: Development
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    com.lockmgr: TRACE
+    io.grpc: DEBUG
+
+---
+# Profile: Test
+spring:
+  config:
+    activate:
+      on-profile: test
+
+lockmgr:
+  raft:
+    election-timeout-ms: 50
+    heartbeat-interval-ms: 20
+  region:
+    quorum-timeout-ms: 1000
