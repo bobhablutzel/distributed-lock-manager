@@ -69,6 +69,166 @@ docker-compose logs -f
 docker-compose down
 ```
 
+## Kubernetes Deployment with Istio
+
+For production deployments, the lock manager can be deployed to Kubernetes with Istio service mesh for mTLS, traffic management, and observability.
+
+### Prerequisites
+
+- Kubernetes 1.19+
+- Helm 3.0+
+- istioctl 1.10+
+
+### Install Istio
+
+```bash
+# Install Istio with the demo profile
+istioctl install --set profile=demo -y
+
+# Verify installation
+kubectl get pods -n istio-system
+```
+
+### Deploy the Lock Manager
+
+```bash
+# Build the Docker image (if using local registry)
+docker build -t lockmgr:latest .
+
+# Deploy US-East region
+helm upgrade --install lockmgr-us-east helm/lockmgr \
+  -f helm/lockmgr/values-us-east.yaml \
+  -n lockmgr-us-east --create-namespace
+
+# Deploy US-West region
+helm upgrade --install lockmgr-us-west helm/lockmgr \
+  -f helm/lockmgr/values-us-west.yaml \
+  -n lockmgr-us-west --create-namespace
+
+# Deploy Istio configuration (routes traffic via gateway)
+helm upgrade --install lockmgr-istio helm/lockmgr-istio \
+  -n istio-system \
+  --set gateway.tls.enabled=false \
+  --set 'regions[0].serviceName=lockmgr-us-east' \
+  --set 'regions[1].serviceName=lockmgr-us-west'
+```
+
+### Verify Deployment
+
+```bash
+# Check pods have Istio sidecars (2/2 containers)
+kubectl get pods -n lockmgr-us-east
+kubectl get pods -n lockmgr-us-west
+
+# Verify Istio proxy status
+istioctl proxy-status
+
+# Analyze configuration for errors
+istioctl analyze --all-namespaces
+```
+
+### Architecture with Istio
+
+```
+                    ┌─────────────────────────────────────────────┐
+                    │           Istio Ingress Gateway             │
+                    │              locks.example.com              │
+                    │                  :80 (gRPC)                 │
+                    └─────────────────┬───────────────────────────┘
+                                      │
+              ┌───────────────────────┴───────────────────────┐
+              │           VirtualService Routing              │
+              │           Header: x-region                    │
+              ▼                                               ▼
+   ┌──────────────────────┐                       ┌──────────────────────┐
+   │  lockmgr-us-east     │◄─────── mTLS ────────►│  lockmgr-us-west     │
+   │  namespace           │                       │  namespace           │
+   │  ┌────────────────┐  │                       │  ┌────────────────┐  │
+   │  │ Pod + Envoy    │  │                       │  │ Pod + Envoy    │  │
+   │  │ Pod + Envoy    │  │                       │  │ Pod + Envoy    │  │
+   │  │ Pod + Envoy    │  │                       │  │ Pod + Envoy    │  │
+   │  └────────────────┘  │                       │  └────────────────┘  │
+   └──────────────────────┘                       └──────────────────────┘
+```
+
+### Testing through Istio Gateway
+
+**Docker Desktop Setup (one-time)**
+
+Enable direct localhost access by patching the ingress gateway to use hostPort:
+
+```bash
+kubectl patch deployment istio-ingressgateway -n istio-system --type='json' -p='[
+  {"op": "add", "path": "/spec/template/spec/containers/0/ports/1/hostPort", "value": 80}
+]'
+```
+
+**Testing the Lock Service**
+
+```bash
+# List available services
+grpcurl -plaintext -authority locks.example.com localhost:80 list
+
+# Acquire a lock (routes to default region: us-east)
+grpcurl -plaintext -authority locks.example.com -d '{
+  "lock_id": "550e8400-e29b-41d4-a716-446655440000",
+  "client_id": "my-client",
+  "timeout_ms": 30000
+}' localhost:80 com.nationsbenefits.grpc.LockService/AcquireLock
+
+# Route to US-West using x-region header
+grpcurl -plaintext -authority locks.example.com \
+  -H "x-region: us-west" -d '{
+  "lock_id": "660e8400-e29b-41d4-a716-446655440001",
+  "client_id": "west-client",
+  "timeout_ms": 30000
+}' localhost:80 com.nationsbenefits.grpc.LockService/AcquireLock
+
+# Check lock status
+grpcurl -plaintext -authority locks.example.com -d '{
+  "lock_id": "550e8400-e29b-41d4-a716-446655440000"
+}' localhost:80 com.nationsbenefits.grpc.LockService/CheckLock
+```
+
+**Alternative: Port-forward (if hostPort isn't available)**
+
+```bash
+kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80 &
+# Then use localhost:8080 instead of localhost:80
+```
+
+**Production (LoadBalancer IP)**
+
+```bash
+export GATEWAY_IP=$(kubectl get svc istio-ingressgateway -n istio-system \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+grpcurl -plaintext -authority locks.example.com $GATEWAY_IP:80 \
+  com.nationsbenefits.grpc.LockService/AcquireLock
+```
+
+### Istio Features
+
+| Feature | Description |
+|---------|-------------|
+| **mTLS** | Strict mutual TLS between all services |
+| **Header-based routing** | Route to specific region via `x-region` header |
+| **Automatic retries** | 3 retry attempts on connection failures |
+| **Circuit breaking** | Outlier detection ejects unhealthy pods |
+| **Connection pooling** | HTTP/2 with configurable max requests |
+
+### Cleanup
+
+```bash
+helm uninstall lockmgr-istio -n istio-system
+helm uninstall lockmgr-us-east -n lockmgr-us-east
+helm uninstall lockmgr-us-west -n lockmgr-us-west
+kubectl delete namespace lockmgr-us-east lockmgr-us-west
+istioctl uninstall --purge -y
+```
+
+For detailed Istio configuration options, see [helm/lockmgr-istio/README.md](helm/lockmgr-istio/README.md).
+
 ## Testing the gRPC API
 
 ### Install grpcurl

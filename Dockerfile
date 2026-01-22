@@ -28,9 +28,9 @@ COPY --from=builder /app/target/lockmgr-*.jar app.jar
 # Expose gRPC ports
 EXPOSE 9090 9091
 
-# Health check
+# Health check (TCP check on gRPC port)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+    CMD nc -z localhost 9090 || exit 1
 
 # JVM options for containers
 ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport"

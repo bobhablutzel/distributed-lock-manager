@@ -115,27 +115,42 @@ kubectl create secret tls lockmgr-tls-cert \
 
 ### Routing by Region Header
 
-Requests are routed based on the `x-region` header:
+Requests are routed based on the `x-region` header.
+
+**Local Development (Docker Desktop / port-forward):**
 
 ```bash
-# Get Istio ingress IP
+# Start port-forward to the ingress gateway
+kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80 &
+
+# Acquire lock in US-East (default, no header needed)
+grpcurl -plaintext -authority locks.example.com \
+  -d '{"lock_id": "550e8400-e29b-41d4-a716-446655440000", "client_id": "test", "timeout_ms": 30000}' \
+  localhost:8080 com.nationsbenefits.grpc.LockService/AcquireLock
+
+# Acquire lock in US-West (explicit routing)
+grpcurl -plaintext -authority locks.example.com -H "x-region: us-west" \
+  -d '{"lock_id": "660e8400-e29b-41d4-a716-446655440001", "client_id": "test", "timeout_ms": 30000}' \
+  localhost:8080 com.nationsbenefits.grpc.LockService/AcquireLock
+
+# Check lock status (routes to default region)
+grpcurl -plaintext -authority locks.example.com \
+  -d '{"lock_id": "550e8400-e29b-41d4-a716-446655440000"}' \
+  localhost:8080 com.nationsbenefits.grpc.LockService/CheckLock
+
+# Stop port-forward
+kill %1
+```
+
+**Production (LoadBalancer IP):**
+
+```bash
 export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
-# Acquire lock in US-East
-grpcurl -plaintext -H "x-region: us-east" \
+grpcurl -plaintext -authority locks.example.com -H "x-region: us-east" \
   -d '{"lock_id": "550e8400-e29b-41d4-a716-446655440000", "client_id": "test", "timeout_ms": 30000}' \
   $INGRESS_HOST:80 com.nationsbenefits.grpc.LockService/AcquireLock
-
-# Acquire lock in US-West
-grpcurl -plaintext -H "x-region: us-west" \
-  -d '{"lock_id": "550e8400-e29b-41d4-a716-446655440000", "client_id": "test", "timeout_ms": 30000}' \
-  $INGRESS_HOST:80 com.nationsbenefits.grpc.LockService/AcquireLock
-
-# Default routing (no header) goes to us-east
-grpcurl -plaintext \
-  -d '{"lock_id": "550e8400-e29b-41d4-a716-446655440000"}' \
-  $INGRESS_HOST:80 com.nationsbenefits.grpc.LockService/CheckLock
 ```
 
 ### Verify mTLS

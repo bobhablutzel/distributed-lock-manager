@@ -71,16 +71,19 @@ Create the headless service name
 
 {{/*
 Generate Raft peer list from replica count
+Format: nodeId:host:port,nodeId:host:port,...
 */}}
 {{- define "lockmgr.raftPeers" -}}
 {{- $fullname := include "lockmgr.fullname" . -}}
 {{- $headless := include "lockmgr.headlessServiceName" . -}}
 {{- $namespace := .Release.Namespace -}}
-{{- $port := .Values.service.grpcPort -}}
+{{- $port := int .Values.service.grpcPort -}}
 {{- $replicas := int .Values.replicaCount -}}
 {{- $peers := list -}}
 {{- range $i := until $replicas -}}
-{{- $peers = append $peers (printf "%s-%d.%s.%s.svc.cluster.local:%d" $fullname $i $headless $namespace $port) -}}
+{{- $nodeId := printf "%s-%d" $fullname $i -}}
+{{- $host := printf "%s.%s.%s.svc.cluster.local" $nodeId $headless $namespace -}}
+{{- $peers = append $peers (printf "%s:%s:%d" $nodeId $host $port) -}}
 {{- end -}}
 {{- join "," $peers -}}
 {{- end }}

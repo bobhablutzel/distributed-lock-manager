@@ -53,9 +53,8 @@ spec:
             - configMapRef:
                 name: {{ include "lockmgr.fullname" . }}-config
           livenessProbe:
-            httpGet:
-              path: /actuator/health
-              port: actuator
+            tcpSocket:
+              port: grpc
             initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds }}
             periodSeconds: {{ .Values.healthCheck.periodSeconds }}
             timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds }}
