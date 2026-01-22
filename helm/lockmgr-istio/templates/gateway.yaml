@@ -1,0 +1,27 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    {{- include "lockmgr-istio.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- toYaml .Values.gateway.selector | nindent 4 }}
+  servers:
+    - port:
+        number: 80
+        name: grpc
+        protocol: GRPC
+      hosts:
+        - {{ .Values.gateway.host | quote }}
+    {{- if .Values.gateway.tls.enabled }}
+    - port:
+        number: 443
+        name: grpc-tls
+        protocol: GRPC
+      hosts:
+        - {{ .Values.gateway.host | quote }}
+      tls:
+        mode: {{ .Values.gateway.tls.mode }}
+        credentialName: {{ .Values.gateway.tls.credentialName }}
+    {{- end }}

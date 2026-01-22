@@ -1,0 +1,45 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: lockmgr-routing
+  labels:
+    {{- include "lockmgr-istio.labels" . | nindent 4 }}
+spec:
+  hosts:
+    - {{ .Values.gateway.host | quote }}
+  gateways:
+    - {{ .Values.gateway.name }}
+  http:
+    {{- range .Values.regions }}
+    # Route to {{ .id }} when x-region header matches
+    - match:
+        - headers:
+            x-region:
+              exact: {{ .id | quote }}
+      route:
+        - destination:
+            host: {{ .serviceName }}.{{ .namespace }}.svc.cluster.local
+            port:
+              number: {{ .servicePort }}
+      timeout: {{ $.Values.virtualService.timeout }}
+      retries:
+        attempts: {{ $.Values.virtualService.retries.attempts }}
+        perTryTimeout: {{ $.Values.virtualService.retries.perTryTimeout }}
+        retryOn: {{ $.Values.virtualService.retries.retryOn }}
+    {{- end }}
+    # Default route (no x-region header) goes to default region
+    - route:
+        - destination:
+            {{- $defaultRegion := .Values.defaultRegion }}
+            {{- range .Values.regions }}
+            {{- if eq .id $defaultRegion }}
+            host: {{ .serviceName }}.{{ .namespace }}.svc.cluster.local
+            port:
+              number: {{ .servicePort }}
+            {{- end }}
+            {{- end }}
+      timeout: {{ .Values.virtualService.timeout }}
+      retries:
+        attempts: {{ .Values.virtualService.retries.attempts }}
+        perTryTimeout: {{ .Values.virtualService.retries.perTryTimeout }}
+        retryOn: {{ .Values.virtualService.retries.retryOn }}

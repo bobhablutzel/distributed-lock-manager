@@ -1,0 +1,25 @@
+{{- range .Values.regions }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: lockmgr-{{ .id }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "lockmgr-istio.labels" $ | nindent 4 }}
+spec:
+  host: {{ .serviceName }}.{{ .namespace }}.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        h2UpgradePolicy: {{ $.Values.destinationRule.connectionPool.http.h2UpgradePolicy }}
+        http2MaxRequests: {{ $.Values.destinationRule.connectionPool.http.http2MaxRequests }}
+        maxRequestsPerConnection: {{ $.Values.destinationRule.connectionPool.http.maxRequestsPerConnection }}
+    outlierDetection:
+      consecutive5xxErrors: {{ $.Values.destinationRule.outlierDetection.consecutive5xxErrors }}
+      interval: {{ $.Values.destinationRule.outlierDetection.interval }}
+      baseEjectionTime: {{ $.Values.destinationRule.outlierDetection.baseEjectionTime }}
+      maxEjectionPercent: {{ $.Values.destinationRule.outlierDetection.maxEjectionPercent }}
+    tls:
+      mode: {{ $.Values.destinationRule.tls.mode }}
+{{- end }}

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "lockmgr.fullname" . }}
+  labels:
+    {{- include "lockmgr.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.service.grpcPort }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: {{ .Values.service.regionPort }}
+      targetPort: region
+      protocol: TCP
+      name: region
+    - port: {{ .Values.service.actuatorPort }}
+      targetPort: actuator
+      protocol: TCP
+      name: actuator
+  selector:
+    {{- include "lockmgr.selectorLabels" . | nindent 4 }}

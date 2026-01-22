@@ -1,0 +1,14 @@
+apiVersion: v2
+name: lockmgr-istio
+description: Istio service mesh configuration for distributed lock manager
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://freesvg.org/img/padlock.png
+keywords:
+  - istio
+  - service-mesh
+  - mtls
+  - grpc
+maintainers:
+  - name: NationsBenefits

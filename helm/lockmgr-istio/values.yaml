@@ -1,0 +1,55 @@
+# Default values for lockmgr-istio
+# This is a YAML-formatted file.
+
+# Gateway configuration
+gateway:
+  name: lockmgr-gateway
+  host: locks.example.com
+  selector:
+    istio: ingressgateway
+  tls:
+    enabled: true
+    mode: SIMPLE
+    credentialName: lockmgr-tls-cert
+
+# Regions configuration
+regions:
+  - id: us-east
+    namespace: lockmgr-us-east
+    serviceName: lockmgr
+    servicePort: 9090
+  - id: us-west
+    namespace: lockmgr-us-west
+    serviceName: lockmgr
+    servicePort: 9090
+
+# Default region for requests without x-region header
+defaultRegion: us-east
+
+# Virtual service configuration
+virtualService:
+  retries:
+    attempts: 3
+    perTryTimeout: 10s
+    retryOn: connect-failure,refused-stream,unavailable,cancelled,retriable-status-codes
+  timeout: 30s
+
+# Destination rule configuration
+destinationRule:
+  connectionPool:
+    http:
+      h2UpgradePolicy: UPGRADE
+      http2MaxRequests: 100
+      maxRequestsPerConnection: 10
+  outlierDetection:
+    consecutive5xxErrors: 3
+    interval: 30s
+    baseEjectionTime: 30s
+    maxEjectionPercent: 50
+  tls:
+    mode: ISTIO_MUTUAL
+
+# Peer authentication (mTLS)
+peerAuthentication:
+  mtls:
+    mode: STRICT

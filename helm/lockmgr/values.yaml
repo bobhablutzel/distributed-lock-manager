@@ -1,0 +1,75 @@
+# Default values for lockmgr
+# This is a YAML-formatted file.
+
+replicaCount: 3
+
+region:
+  id: "us-east"
+  peers: []  # Cross-region peers
+
+image:
+  repository: lockmgr
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+resources:
+  limits:
+    memory: 512Mi
+    cpu: 500m
+  requests:
+    memory: 256Mi
+    cpu: 250m
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Raft consensus configuration
+raft:
+  electionTimeoutMs: 150
+  heartbeatIntervalMs: 50
+
+# Lock configuration
+lock:
+  defaultTimeoutMs: 30000
+  maxTimeoutMs: 300000
+  minTimeoutMs: 1000
+
+# Service ports
+service:
+  grpcPort: 9090
+  regionPort: 9091
+  actuatorPort: 8080
+
+# Health check configuration
+healthCheck:
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+# Readiness check configuration
+readinessCheck:
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1

@@ -1,0 +1,7 @@
+# US-West region configuration
+region:
+  id: "us-west"
+  peers:
+    - regionId: "us-east"
+      host: "lockmgr.lockmgr-us-east.svc.cluster.local"
+      port: 9091

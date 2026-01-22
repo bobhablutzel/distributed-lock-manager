@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lockmgr.fullname" . }}-config
+  labels:
+    {{- include "lockmgr.labels" . | nindent 4 }}
+data:
+  REGION_ID: {{ .Values.region.id | quote }}
+  RAFT_ELECTION_TIMEOUT_MS: {{ .Values.raft.electionTimeoutMs | quote }}
+  RAFT_HEARTBEAT_INTERVAL_MS: {{ .Values.raft.heartbeatIntervalMs | quote }}
+  LOCK_DEFAULT_TIMEOUT_MS: {{ .Values.lock.defaultTimeoutMs | quote }}
+  LOCK_MAX_TIMEOUT_MS: {{ .Values.lock.maxTimeoutMs | quote }}
+  LOCK_MIN_TIMEOUT_MS: {{ .Values.lock.minTimeoutMs | quote }}
+  GRPC_PORT: {{ .Values.service.grpcPort | quote }}
+  REGION_PORT: {{ .Values.service.regionPort | quote }}
+  ACTUATOR_PORT: {{ .Values.service.actuatorPort | quote }}
+  REGION_PEERS: {{ include "lockmgr.regionPeersJson" . | quote }}

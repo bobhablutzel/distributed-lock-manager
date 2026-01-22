@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "lockmgr.fullname" . }}
+  labels:
+    {{- include "lockmgr.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "lockmgr.headlessServiceName" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "lockmgr.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "lockmgr.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "lockmgr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+              protocol: TCP
+            - name: region
+              containerPort: {{ .Values.service.regionPort }}
+              protocol: TCP
+            - name: actuator
+              containerPort: {{ .Values.service.actuatorPort }}
+              protocol: TCP
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RAFT_PEERS
+              value: {{ include "lockmgr.raftPeers" . | quote }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "lockmgr.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: actuator
+            initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.healthCheck.failureThreshold }}
+            successThreshold: {{ .Values.healthCheck.successThreshold }}
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: {{ .Values.readinessCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessCheck.failureThreshold }}
+            successThreshold: {{ .Values.readinessCheck.successThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
